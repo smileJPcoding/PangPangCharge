@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>パンパンチャージ</title>
+<style>
+  :root {
+    --bg: #f6f3ee;
+    --panel: #ffffff;
+    --ink: #222;
+    --sub: #666;
+    --line: #ddd5c8;
+    --charge: #e9a400;
+    --barrier: #2f7fd8;
+    --beam: #e0473b;
+    --ultra: #9b3fd6;
+    --win: #1a9a57;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17171b; --panel: #222228; --ink: #eee; --sub: #aaa; --line: #3a3a44;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  h1 { margin: 8px 0 4px; font-size: 28px; letter-spacing: .05em; }
+  .lead { color: var(--sub); margin: 0 0 16px; font-size: 14px; }
+
+  .modes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .modes button, .ctrl button {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 14px;
+  }
+  .modes button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+  .arena {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: stretch;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px;
+  }
+  .side { text-align: center; padding: 8px; border-radius: 12px; transition: background .3s; }
+  .side.win { background: color-mix(in srgb, var(--win) 18%, transparent); }
+  .side.lose { opacity: .5; }
+  .name { font-weight: 700; font-size: 18px; }
+  .gauge { display: flex; gap: 6px; justify-content: center; margin: 10px 0; }
+  .pip {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--charge);
+    transition: background .2s, transform .2s;
+  }
+  .pip.full { background: var(--charge); transform: scale(1.08); }
+  .pip.max { border-color: var(--ultra); background: var(--ultra); box-shadow: 0 0 10px var(--ultra); }
+  .hand {
+    font-size: 64px; height: 96px; line-height: 96px; margin: 4px 0;
+    transition: transform .15s;
+  }
+  .hand.pop { animation: pop .35s ease-out; }
+  @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.2); } 100% { transform: scale(1); } }
+  .act { min-height: 24px; font-weight: 700; }
+  .status { font-size: 13px; color: var(--sub); min-height: 18px; }
+
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 120px; }
+  .call { font-size: 34px; font-weight: 900; height: 48px; letter-spacing: .05em; }
+  .call.clap { animation: clap .3s ease-out; }
+  @keyframes clap { 0% { transform: scale(1.6); opacity: .3; } 100% { transform: scale(1); opacity: 1; } }
+  .turn { color: var(--sub); font-size: 13px; }
+
+  .message {
+    text-align: center; margin: 14px 0; font-size: 18px; font-weight: 700; min-height: 28px;
+  }
+  .message.win { color: var(--win); }
+  .message.lose { color: var(--beam); }
+
+  .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pads.single { grid-template-columns: 1fr; }
+  .pad { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+  .pad h2 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; }
+  .pad h2 .ready { color: var(--win); font-size: 13px; }
+  .btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .abtn {
+    border: 2px solid var(--c); background: transparent; color: var(--ink);
+    border-radius: 12px; padding: 10px 4px; cursor: pointer; font: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    transition: background .15s, transform .1s;
+  }
+  .abtn:hover:not(:disabled) { background: color-mix(in srgb, var(--c) 15%, transparent); }
+  .abtn:active:not(:disabled) { transform: scale(.96); }
+  .abtn:disabled { opacity: .3; cursor: not-allowed; }
+  .abtn.picked { background: var(--c); color: #fff; }
+  .abtn .emo { font-size: 28px; height: 1.2em; display: flex; align-items: center; }
+  svg.ki { width: 1.2em; height: 1.2em; filter: drop-shadow(0 0 4px #5cc8ff); }
+  #hand1 svg.ki { transform: scaleX(-1); }
+  .abtn .lbl { font-weight: 700; font-size: 14px; }
+  .abtn .key { font-size: 11px; color: var(--sub); }
+  .abtn.picked .key { color: #fff; }
+  .hidden2p .abtn.picked { background: var(--sub); border-color: var(--sub); }
+
+  .gauge .secret { font-size: 20px; font-weight: 900; color: var(--sub); height: 26px; line-height: 26px; letter-spacing: .3em; }
+  .options { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+  .options label { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; margin: 10px 0; }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .ratio { display: grid; grid-template-columns: auto repeat(4, 1fr); gap: 6px; align-items: center; font-size: 13px; }
+  .ratio .hd { text-align: center; color: var(--sub); font-weight: 700; }
+  .ratio .rh { color: var(--sub); font-weight: 700; white-space: nowrap; padding-right: 4px; }
+  .ratio .corner { font-size: 11px; color: var(--sub); line-height: 1.3; }
+  .bar { display: flex; height: 34px; border-radius: 8px; overflow: hidden; }
+  .bar div {
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+    min-width: 0;
+  }
+  @media (max-width: 600px) { .bar { height: 30px; } .bar div { font-size: 10px; } }
+  .ctrl { display: flex; justify-content: center; gap: 8px; margin: 14px 0; }
+
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px; margin-top: 16px; }
+  summary { cursor: pointer; font-weight: 700; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 8px 0; }
+  th, td { border: 1px solid var(--line); padding: 6px; text-align: center; }
+  .log { max-height: 220px; overflow-y: auto; font-size: 13px; line-height: 1.7; }
+  .log div { border-bottom: 1px dashed var(--line); }
+
+  @media (max-width: 600px) {
+    .arena { grid-template-columns: 1fr 70px 1fr; padding: 8px; gap: 4px; }
+    .hand { font-size: 44px; height: 64px; line-height: 64px; }
+    .pip { width: 18px; height: 18px; }
+    .call { font-size: 22px; }
+    .center { min-width: 70px; }
+    .pads { grid-template-columns: 1fr; }
+    .abtn .emo { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>パンパンチャージ</h1>
+  <p class="lead">「パン、パン」の合図で同時に行動！ チャージを溜めて、相手の隙を撃て。</p>
+
+  <div class="modes">
+    <button data-mode="cpu" class="on">vs CPU</button>
+    <button data-mode="2p">2人対戦（同じ画面）</button>
+  </div>
+
+  <section class="arena">
+    <div class="side" id="side0">
+      <div class="name" id="name0">あなた</div>
+      <div class="gauge" id="gauge0"></div>
+      <div class="hand" id="hand0">🙂</div>
+      <div class="act" id="act0"></div>
+      <div class="status" id="status0"></div>
+    </div>
+    <div class="center">
+      <div class="call" id="call">VS</div>
+      <div class="turn" id="turn">ターン 1</div>
+    </div>
+    <div class="side" id="side1">
+      <div class="name" id="name1">CPU</div>
+      <div class="gauge" id="gauge1"></div>
+      <div class="hand" id="hand1">🤖</div>
+      <div class="act" id="act1"></div>
+      <div class="status" id="status1"></div>
+    </div>
+  </section>
+
+  <div class="message" id="message">行動を選んでください</div>
+
+  <div class="pads" id="pads"></div>
+
+  <div class="options">
+    <label><input type="checkbox" id="hide0"> <span id="hideLabel0">自分のチャージを隠す</span></label>
+    <label><input type="checkbox" id="hide1"> <span id="hideLabel1">相手のチャージを隠す</span></label>
+    <span style="color:var(--sub)">（スペースキーを押している間は双方表示）</span>
+  </div>
+
+  <div class="ctrl">
+    <button id="reset">最初からやり直す</button>
+    <button id="sound">🔊 音あり</button>
+  </div>
+
+  <details>
+    <summary>局面ごとの選択割合（％）</summary>
+    <div class="legend">
+      <span><i style="background:var(--charge)"></i>チャージ</span>
+      <span><i style="background:var(--barrier)"></i>バリア</span>
+      <span><i style="background:var(--beam)"></i>ビーム</span>
+      <span><i style="background:var(--ultra)"></i>ウルトラ</span>
+    </div>
+    <div class="ratio" id="ratio"></div>
+  </details>
+
+  <details open>
+    <summary>対戦ログ</summary>
+    <div class="log" id="log"></div>
+  </details>
+
+  <details>
+    <summary>ルール</summary>
+    <table>
+      <tr><th>行動</th><th>使用条件</th><th>効果</th></tr>
+      <tr><td>⚡ チャージ</td><td>いつでも</td><td>自分のチャージを1増やす（上限3）</td></tr>
+      <tr><td>🛡️ バリア</td><td>いつでも</td><td>通常ビームを防ぐ。ウルトラは防げない</td></tr>
+      <tr><td><svg class="ki" style="width:1.4em;height:1.4em;vertical-align:middle" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 20 L64 25 L64 39 L18 44 Z" fill="#5cc8ff" opacity=".55"/><path d="M18 26 L64 29 L64 35 L18 38 Z" fill="#e8f8ff"/><circle cx="18" cy="32" r="16" fill="#5cc8ff" opacity=".45"/><circle cx="18" cy="32" r="11" fill="#9fe3ff"/><circle cx="18" cy="32" r="6" fill="#fff"/></svg> ビーム</td><td>チャージ1〜2で攻撃</td><td>チャージ中の相手に当たれば勝ち</td></tr>
+      <tr><td>💥 ウルトラ</td><td>チャージ3で攻撃（必ずこちら）</td><td>チャージ中・防御中の相手に当たれば勝ち</td></tr>
+    </table>
+    <table>
+      <tr><th>自分＼相手</th><th>チャージ</th><th>防御</th><th>ビーム</th><th>ウルトラ</th></tr>
+      <tr><th>チャージ</th><td>双方+1</td><td>自分だけ+1</td><td>負け</td><td>負け</td></tr>
+      <tr><th>防御</th><td>相手だけ+1</td><td>変化なし</td><td>防ぐ。相手だけ0</td><td>負け</td></tr>
+      <tr><th>ビーム</th><td>勝ち</td><td>防がれる。自分だけ0</td><td>相殺。双方0</td><td>相殺。双方0</td></tr>
+      <tr><th>ウルトラ</th><td>勝ち</td><td>貫通して勝ち</td><td>相殺。双方0</td><td>相殺。双方0</td></tr>
+    </table>
+    <p style="font-size:13px;color:var(--sub)">攻撃するとチャージはすべて失い0になります（防がれても相殺されても同じ）。防御してもチャージは減りません。</p>
+  </details>
+</main>
+
+<script>
+// かめはめ波風のエネルギー波（右向き。右側のプレイヤーは左右反転して表示）
+const BEAM_ICON = '<svg class="ki" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 20 L64 25 L64 39 L18 44 Z" fill="#5cc8ff" opacity=".55"/><path d="M18 26 L64 29 L64 35 L18 38 Z" fill="#e8f8ff"/><circle cx="18" cy="32" r="16" fill="#5cc8ff" opacity=".45"/><circle cx="18" cy="32" r="11" fill="#9fe3ff"/><circle cx="18" cy="32" r="6" fill="#fff"/></svg>';
+const ACTIONS = {
+  charge:  { label: 'チャージ', emo: '⚡', color: 'var(--charge)' },
+  barrier: { label: 'バリア',   emo: '🛡️', color: 'var(--barrier)' },
+  beam:    { label: 'ビーム',   emo: BEAM_ICON, color: 'var(--beam)' },
+  ultra:   { label: 'ウルトラ', emo: '💥', color: 'var(--ultra)' },
+};
+const ORDER = ['charge', 'barrier', 'beam', 'ultra'];
+// ボタンは3つ。攻撃ボタンはチャージ1〜2ならビーム、3ならウルトラになる
+const BUTTONS = ['charge', 'barrier', 'attack'];
+const KEYS = [['1', '2', '3']];
+const KEYS_2P = [['a', 's', 'd'], ['j', 'k', 'l']];
+const attackOf = charge => charge >= MAX ? 'ultra' : 'beam';
+const toAction = (b, charge) => b === 'attack' ? attackOf(charge) : b;
+const MAX = 3;
+
+let mode = 'cpu';
+let state, picks, soundOn = true;
+const hidden = [false, false]; // チャージ数を非表示にするか（決着後は公開）
+let readyAt = 0, times = [[], []]; // 選択可能になった時刻と、各プレイヤーの決定時間(ms)
+let peeking = false; // スペースキーを押している間は双方のチャージを表示
+const isHidden = p => hidden[p] && state.winner === null && !peeking;
+
+const $ = id => document.getElementById(id);
+
+function canUse(action, charge) {
+  if (action === 'beam') return charge >= 1 && charge <= 2;
+  if (action === 'ultra') return charge >= MAX;
+  return true;
+}
+const isAttack = a => a === 'beam' || a === 'ultra';
+
+// 2人の行動から次の状態と勝者を決める。winner: 0 / 1 / null
+function resolve(c, a) {
+  const next = [...c];
+  let winner = null, note = '';
+  const [x, y] = a;
+  if (isAttack(x) && isAttack(y)) {
+    next[0] = next[1] = 0; note = '攻撃同士が相殺！ 双方0に';
+  } else if (isAttack(x) || isAttack(y)) {
+    const atk = isAttack(x) ? 0 : 1, def = 1 - atk;
+    const atkAct = a[atk], defAct = a[def];
+    next[atk] = 0;
+    if (defAct === 'charge') { winner = atk; note = 'チャージ中に被弾！'; }
+    else if (atkAct === 'ultra') { winner = atk; note = 'ウルトラがバリアを貫通！'; }
+    else { note = 'ビームをバリアで防いだ！'; }
+  } else {
+    for (const i of [0, 1]) if (a[i] === 'charge') next[i] = Math.min(MAX, next[i] + 1);
+    if (x === 'charge' && y === 'charge') note = '双方チャージ';
+    else if (x === 'barrier' && y === 'barrier') note = '双方バリア。変化なし';
+    else note = `${names()[x === 'charge' ? 0 : 1]}だけチャージ`;
+  }
+  return { next, winner, note };
+}
+
+function names() { return mode === 'cpu' ? ['あなた', 'CPU'] : ['プレイヤー1', 'プレイヤー2']; }
+
+// ---- CPU ----
+// 必然手（あなたのチャージ / CPUのチャージ → CPUの行動）
+const FORCED = {
+  '0/0': 'charge', // どちらも攻撃できない → 溜めるのが最善
+  '0/3': 'attack', // あなたは攻撃できず、ウルトラは防げない → 確実に勝てる
+  '3/3': 'attack', // 攻撃しないとウルトラを受ける → 撃って相殺
+};
+
+function cpuPick(me, opp) {
+  const forced = FORCED[`${opp}/${me}`];
+  if (forced) return toAction(forced, me);
+  const w = { charge: 0, barrier: 0, beam: 0, ultra: 0 };
+  if (me >= MAX) {
+    w.ultra = 6; w.barrier = opp >= 1 && opp < MAX ? 2 : 0.3;
+    if (opp >= MAX) { w.ultra = 8; w.barrier = 0; }
+  } else if (opp === 0) {
+    // 相手は攻撃できない → 溜めるか、チャージ狙いで撃つ
+    w.charge = 6; if (me >= 1) w.beam = 2.5;
+  } else if (opp >= MAX) {
+    // 相手はウルトラ可能 → バリア無意味。撃てるなら相殺狙い
+    w.charge = 2; w.barrier = 0.5; if (me >= 1) w.beam = 5;
+  } else {
+    w.charge = 3; w.barrier = 3.5; if (me >= 1) w.beam = 2.5;
+    if (me === 2) w.charge = 4; // 次でウルトラ
+  }
+  for (const k of ORDER) if (!canUse(k, me)) w[k] = 0;
+  const total = ORDER.reduce((s, k) => s + w[k], 0);
+  let r = Math.random() * total;
+  for (const k of ORDER) { r -= w[k]; if (r < 0) return k; }
+  return 'charge';
+}
+
+// ---- Sound ----
+let ctx;
+function clapSound(big) {
+  if (!soundOn) return;
+  try {
+    ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const len = 0.12, buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, big ? 2 : 4);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = big ? 900 : 1500;
+    const g = ctx.createGain(); g.gain.value = big ? 1.2 : 0.8;
+    src.connect(f).connect(g).connect(ctx.destination); src.start();
+  } catch (e) {}
+}
+
+// ---- UI ----
+function buildPads() {
+  const pads = $('pads');
+  pads.innerHTML = '';
+  pads.className = 'pads' + (mode === 'cpu' ? ' single' : ' hidden2p');
+  const players = mode === 'cpu' ? [0] : [0, 1];
+  for (const p of players) {
+    const keys = mode === 'cpu' ? KEYS[0] : KEYS_2P[p];
+    const pad = document.createElement('div');
+    pad.className = 'pad';
+    pad.innerHTML = `<h2><span>${names()[p]}${mode === '2p' ? '（キーで内緒に選べます）' : ''}</span><span class="ready" id="ready${p}"></span></h2><div class="btns"></div>`;
+    const btns = pad.querySelector('.btns');
+    BUTTONS.forEach((a, i) => {
+      const b = document.createElement('button');
+      b.className = 'abtn'; b.dataset.p = p; b.dataset.a = a;
+      b.innerHTML = `<span class="emo"></span><span class="lbl"></span><span class="key">[${keys[i].toUpperCase()}]</span>`;
+      b.onclick = () => choose(p, a);
+      btns.appendChild(b);
+    });
+    pads.appendChild(pad);
+  }
+}
+
+function render() {
+  const n = names();
+  for (const p of [0, 1]) {
+    $('name' + p).textContent = n[p];
+    const g = $('gauge' + p); g.innerHTML = '';
+    if (isHidden(p)) {
+      g.innerHTML = '<div class="secret">???</div>';
+      $('status' + p).textContent = 'チャージ ?';
+      $('side' + p).className = 'side';
+      continue;
+    }
+    for (let i = 0; i < MAX; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'pip' + (i < state.charge[p] ? (state.charge[p] >= MAX ? ' max' : ' full') : '');
+      g.appendChild(pip);
+    }
+    $('status' + p).textContent = `チャージ ${state.charge[p]}` + (state.charge[p] >= MAX ? '（ウルトラ可）' : '');
+    $('side' + p).className = 'side' + (state.winner === p ? ' win' : state.winner === 1 - p ? ' lose' : '');
+  }
+  $('turn').textContent = `ターン ${state.turn}`;
+  document.querySelectorAll('.abtn').forEach(b => {
+    const p = +b.dataset.p, a = toAction(b.dataset.a, state.charge[p]);
+    // チャージを隠しているときは、攻撃ボタンの見た目からも分からないようにする
+    const secret = isHidden(p) && b.dataset.a === 'attack';
+    b.style.setProperty('--c', secret ? 'var(--beam)' : ACTIONS[a].color);
+    b.querySelector('.emo').innerHTML = secret ? BEAM_ICON : ACTIONS[a].emo;
+    b.querySelector('.lbl').textContent = secret ? '攻撃' : ACTIONS[a].label;
+    b.disabled = state.winner !== null || (!secret && !canUse(a, state.charge[p])) || (picks[p] && mode === '2p');
+    b.classList.toggle('picked', !!picks[p] && toAction(b.dataset.a, state.charge[p]) === picks[p]);
+  });
+  if (mode === '2p') for (const p of [0, 1]) { const r = $('ready' + p); if (r) r.textContent = picks[p] ? '✔ 選択済み' : ''; }
+}
+
+function choose(p, btn) {
+  const a = toAction(btn, state.charge[p]);
+  if (state.winner !== null) return;
+  if (mode === '2p' && picks[p]) return;
+  if (!canUse(a, state.charge[p])) {
+    if (isHidden(p)) $('message').textContent = `${names()[p]}：チャージが足りないので攻撃できません`;
+    return;
+  }
+  picks[p] = a;
+  times[p].push(performance.now() - readyAt);
+  if (mode === 'cpu') picks[1] = cpuPick(state.charge[1], state.charge[0]);
+  render();
+  if (picks[0] && picks[1]) play();
+  else $('message').textContent = `${names()[1 - (picks[0] ? 0 : 1)]}の選択を待っています…`;
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+// 「パン、パン」の合図。選択中に流れ、入力で決着したらその場で打ち切る
+let clapToken = 0;
+const cancelClap = () => { clapToken++; };
+async function clapCue(delay) {
+  const t = ++clapToken;
+  await wait(delay);
+  if (t !== clapToken) return;
+  for (const p of [0, 1]) { $('hand' + p).textContent = '👏'; $('act' + p).textContent = ''; }
+  const call = $('call');
+  for (const txt of ['パン', 'パン']) {
+    if (t !== clapToken) return;
+    call.textContent = txt; call.classList.remove('clap'); void call.offsetWidth; call.classList.add('clap');
+    clapSound(false);
+    await wait(450);
+  }
+  if (t === clapToken) call.textContent = '？';
+}
+
+function play() {
+  cancelClap();
+  const msg = $('message'); msg.className = 'message';
+  const call = $('call');
+  call.textContent = '！'; clapSound(true);
+  const a = [...picks];
+  for (const p of [0, 1]) {
+    const h = $('hand' + p);
+    h.innerHTML = ACTIONS[a[p]].emo; h.classList.remove('pop'); void h.offsetWidth; h.classList.add('pop');
+    $('act' + p).textContent = ACTIONS[a[p]].label; $('act' + p).style.color = ACTIONS[a[p]].color;
+  }
+  const before = [...state.charge];
+  const { next, winner, note } = resolve(state.charge, a);
+  state.charge = next; state.winner = winner;
+  const n = names();
+  const ch = p => isHidden(p) && winner === null ? '' : ` (${before[p]}→${next[p]})`;
+  log(`T${state.turn}: ${n[0]} ${ACTIONS[a[0]].label}${ch(0)} / ${n[1]} ${ACTIONS[a[1]].label}${ch(1)} — ${note}`);
+  if (winner !== null) {
+    const youWin = mode === 'cpu' ? winner === 0 : true;
+    msg.className = 'message ' + (youWin ? 'win' : 'lose');
+    msg.textContent = `${note} ${n[winner]}の勝ち！（Enter でもう一戦）`;
+    call.textContent = winner === 0 ? '◀ WIN' : 'WIN ▶';
+    log(`🏆 ${n[winner]}の勝ち（${state.turn}ターン）`);
+    const humans = mode === 'cpu' ? [0] : [0, 1];
+    log('⏱ 平均決定時間：' + humans.map(p => `${n[p]} ${avgSec(times[p])}秒`).join(' ／ '));
+  } else {
+    msg.textContent = note + ' — 次の行動を選んでください';
+    state.turn++;
+    clapCue(1000); // 結果を少し見せてから次の合図。待たずに入力してもよい
+  }
+  picks = [null, null];
+  render();
+  readyAt = performance.now();
+}
+
+// 平均（秒）。小数第2位を四捨五入して第1位まで
+function avgSec(list) {
+  if (!list.length) return '-';
+  const ms = list.reduce((a, b) => a + b, 0) / list.length;
+  return (Math.round(ms / 100) / 10).toFixed(1);
+}
+
+function log(t) {
+  const d = document.createElement('div'); d.textContent = t;
+  $('log').prepend(d);
+}
+
+function reset() {
+  state = { charge: [0, 0], turn: 1, winner: null };
+  picks = [null, null];
+  cancelClap();
+  times = [[], []]; readyAt = performance.now();
+  $('hand0').textContent = mode === 'cpu' ? '🙂' : '🙂';
+  $('hand1').textContent = mode === 'cpu' ? '🤖' : '😎';
+  $('act0').textContent = $('act1').textContent = '';
+  $('call').textContent = 'VS';
+  const msg = $('message'); msg.className = 'message';
+  msg.textContent = mode === 'cpu' ? '行動を選んでください（キー 1〜3 でも可）' : '2人とも行動を選んでください（P1: A S D ／ P2: J K L）';
+  $('hideLabel0').textContent = mode === 'cpu' ? '自分のチャージを隠す' : 'プレイヤー1のチャージを隠す';
+  $('hideLabel1').textContent = mode === 'cpu' ? '相手（CPU）のチャージを隠す' : 'プレイヤー2のチャージを隠す';
+  buildPads(); render();
+  clapCue(600);
+}
+
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (state.winner !== null && (k === 'enter' || k === ' ')) { e.preventDefault(); reset(); return; }
+  if (k === ' ') {
+    e.preventDefault(); // フォーカス中のボタンが押されたりスクロールしたりしないように
+    if (!peeking) { peeking = true; render(); }
+    return;
+  }
+  if (mode === 'cpu') {
+    const i = KEYS[0].indexOf(k); if (i >= 0) choose(0, BUTTONS[i]);
+  } else {
+    for (const p of [0, 1]) { const i = KEYS_2P[p].indexOf(k); if (i >= 0) choose(p, BUTTONS[i]); }
+  }
+});
+
+function stopPeek() { if (peeking) { peeking = false; render(); } }
+document.addEventListener('keyup', e => { if (e.key === ' ') { e.preventDefault(); stopPeek(); } });
+window.addEventListener('blur', stopPeek);
+
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode;
+  document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
+  $('log').innerHTML = '';
+  reset();
+});
+for (const p of [0, 1]) {
+  hidden[p] = $('hide' + p).checked; // リロード時にブラウザが復元したチェック状態に合わせる
+  $('hide' + p).onchange = e => { hidden[p] = e.target.checked; render(); };
+}
+$('reset').onclick = reset;
+$('sound').onclick = () => { soundOn = !soundOn; $('sound').textContent = soundOn ? '🔊 音あり' : '🔇 音なし'; };
+
+// 局面ごとの選択割合（表示専用。CPUのロジックには使わない）
+// [自分のチャージ][相手のチャージ] = [チャージ, バリア, 攻撃]（％）
+const RATIO = [
+  [[100, 0, 0], [50, 50, 0], [75, 25, 0], [100, 0, 0]],
+  [[67, 0, 33], [29, 57, 14], [43, 36, 21], [67, 0, 33]],
+  [[75, 0, 25], [23, 64, 13], [33, 45, 22], [50, 0, 50]],
+  [[0, 0, 100], [0, 67, 33], [0, 50, 50], [0, 0, 100]],
+];
+function buildRatio() {
+  const el = $('ratio');
+  let h = '<div class="corner">自分＼相手</div>' + [0, 1, 2, 3].map(c => `<div class="hd">相手 ${c}</div>`).join('');
+  RATIO.forEach((row, me) => {
+    h += `<div class="rh">自分 ${me}</div>`;
+    const colors = ['var(--charge)', 'var(--barrier)', me >= MAX ? 'var(--ultra)' : 'var(--beam)'];
+    const names = ['チャージ', 'バリア', me >= MAX ? 'ウルトラ' : 'ビーム'];
+    for (const cell of row) {
+      h += '<div class="bar">' + cell.map((v, i) => v ? `<div style="flex:${v};background:${colors[i]}" title="${names[i]} ${v}%">${v}</div>` : '').join('') + '</div>';
+    }
+  });
+  el.innerHTML = h;
+}
+buildRatio();
+reset();
+</script>
+</body>
+</html>
